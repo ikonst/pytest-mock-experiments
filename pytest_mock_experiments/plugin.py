@@ -118,11 +118,10 @@ class MockerFixture(pytest_mock.MockerFixture):
                 for ref in gc.get_referrers(obj):
                     if ref is locals():
                         continue  # don't patch our own locals!
-                    ref_type = type(ref)
-                    if ref_type is dict:
+                    if type(ref) is dict:
                         self.dict(ref, {k: mock for k, v in ref.items() if v is obj})
                     else:
-                        for attr_name in getattr(ref_type, '__slots__', []):
+                        for attr_name in getattr(type(ref), '__slots__', []):
                             attr_value = getattr(ref, attr_name)
                             if attr_value is obj:
                                 self._start_patch(_slot_attr_patcher, False, ref, attr_name, attr_value, mock)

@@ -3,7 +3,7 @@ from datetime import datetime
 from pytest_mock_experiments import MockerFixture
 
 
-dt = datetime(2021, 2, 2)
+dt = datetime(2000, 1, 1)
 dt_additional_ref = dt
 
 
@@ -43,18 +43,34 @@ def test_patch_method__instance_method(mocker: MockerFixture):
     assert mock.call_count == 1
 
 
-def test_patch_refs(mocker: MockerFixture):
+def test_patch_refs__datetime(mocker: MockerFixture):
     class ClassWithSlots:
         __slots__ = ('dt',)
 
     instance_with_slots = ClassWithSlots()
     instance_with_slots.dt = dt
 
-    mocker.patch.refs(dt, new=datetime(2021, 5, 6))
-    assert dt == datetime(2021, 5, 6)
-    assert _get_dt() == (datetime(2021, 5, 6), datetime(2021, 5, 6))
-    assert instance_with_slots.dt == datetime(2021, 5, 6)
+    new_dt = datetime(2021, 11, 12)
+    mocker.patch.refs(dt, new=new_dt)
+    assert dt == new_dt
+    assert _get_dt() == (new_dt, new_dt)
+    assert instance_with_slots.dt == new_dt
 
 
-def test_patch_refs__undone():
-    assert dt == datetime(2021, 2, 2)
+def test_patch_refs__datetime__undone():
+    assert dt == datetime(2000, 1, 1)
+
+
+def test_patch_refs__module_function(mocker: MockerFixture):
+    from . import module1
+    from . import module2
+
+    assert module1.module_func() == 42
+    assert module2.rose_by_any_other_name() == 42
+    assert module2.calls_module_func() == 42
+
+    mocker.patch.refs(module1.module_func, return_value='foo')
+
+    assert module1.module_func() == 'foo'
+    assert module2.rose_by_any_other_name() == 'foo'
+    assert module2.calls_module_func() == 'foo'
