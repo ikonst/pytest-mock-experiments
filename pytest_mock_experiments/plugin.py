@@ -82,7 +82,7 @@ class MockerFixture(pytest_mock.MockerFixture):
                     if cls is None:
                         raise ValueError(
                             f"Could not determine class for {method}: if it's not an unbound method "
-                            f'but a function, consider patch.module_func or patch.object.'
+                            f'but a function, consider patch.refs or patch.object.'
                         )
                     return self.object(cls, method.__name__, *args, **kwargs)
                 else:
@@ -138,7 +138,7 @@ def mocker(pytestconfig: Any) -> Generator[MockerFixture, None, None]:
 
     def test_foo(mocker):
        mocker.patch.method(...)
-       mocker.patch.module_func(...)
+       mocker.patch.refs(...)
     """
     result = MockerFixture(pytestconfig)
     yield result
