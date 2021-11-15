@@ -47,6 +47,8 @@ def test_patch_refs__datetime(mocker: MockerFixture):
     class ClassWithSlots:
         __slots__ = ('dt',)
 
+        dt: datetime
+
     instance_with_slots = ClassWithSlots()
     instance_with_slots.dt = dt
 

@@ -1,6 +1,5 @@
 import gc
 import types
-import unittest.mock
 from typing import Any
 from typing import Callable
 from typing import Generator
@@ -9,6 +8,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 import pytest_mock
+
+if TYPE_CHECKING:
+    import unittest.mock
 
 
 def _class_holding(fn: Callable) -> Optional[type]:  # see https://stackoverflow.com/a/65756960
@@ -21,7 +23,10 @@ def _class_holding(fn: Callable) -> Optional[type]:  # see https://stackoverflow
     return None
 
 
-class _slot_attr_patcher:
+class _attr_patch:
+    """
+    Implements a 'start' and 'stop' like unittest.mock._patch, but only sets an attribute.
+    """
     def __init__(self, target: object, attr_name: str, old_value: Any, new_value: Any) -> None:
         self.target = target
         self.attr_name = attr_name
@@ -36,8 +41,6 @@ class _slot_attr_patcher:
 
 
 class MockerFixture(pytest_mock.MockerFixture):
-    patch: 'MockerFixture._Patcher'
-
     class _Patcher(pytest_mock.MockerFixture._Patcher):
         if TYPE_CHECKING:
 
@@ -51,7 +54,7 @@ class MockerFixture(pytest_mock.MockerFixture):
                 autospec: Optional[object] = ...,
                 new_callable: object = ...,
                 **kwargs: Any,
-            ) -> unittest.mock.MagicMock:
+            ) -> 'unittest.mock.MagicMock':
                 ...
 
         else:
@@ -61,7 +64,7 @@ class MockerFixture(pytest_mock.MockerFixture):
                 method: Callable,
                 *args: Any,
                 **kwargs: Any,
-            ) -> unittest.mock.MagicMock:
+            ) -> 'unittest.mock.MagicMock':
                 """
                 Enables patching bound methods:
 
@@ -100,17 +103,17 @@ class MockerFixture(pytest_mock.MockerFixture):
                     autospec: Optional[object] = ...,
                     new_callable: object = ...,
                     **kwargs: Any,
-            ) -> unittest.mock.MagicMock:
+            ) -> 'unittest.mock.MagicMock':
                 ...
 
         else:
 
-            def refs(self, obj: object, *args: Any, **kwargs: Any) -> unittest.mock.MagicMock:
+            def refs(self, obj: object, *args: Any, **kwargs: Any) -> 'unittest.mock.MagicMock':
                 if isinstance(obj, types.MethodType):
                     # bound methods are somehow special since they're not turned up by gc.get_referrers :O
                     mock = self.object(obj.__self__, obj.__name__, *args, **kwargs)
                 else:
-                    # we want to use unittest.mock._patch w/o patching anything just yet
+                    # we want to exercise unittest.mock._patch's other smarts w/o patching anything just yet
                     class DummyType: dummy_attr = obj
 
                     mock = self.object(DummyType, 'dummy_attr', *args, **kwargs)
@@ -118,17 +121,25 @@ class MockerFixture(pytest_mock.MockerFixture):
                 for ref in gc.get_referrers(obj):
                     if ref is locals():
                         continue  # don't patch our own locals!
+
+                    # objects hold references either through a __dict__ or __slots__
                     if type(ref) is dict:
                         self.dict(ref, {k: mock for k, v in ref.items() if v is obj})
                     else:
-                        for attr_name in getattr(type(ref), '__slots__', []):
+                        slot_names = getattr(type(ref), '__slots__', [])
+                        for attr_name in slot_names:
                             attr_value = getattr(ref, attr_name)
                             if attr_value is obj:
-                                self._start_patch(_slot_attr_patcher, False, ref, attr_name, attr_value, mock)
+                                self._start_patch(_attr_patch, False, ref, attr_name, attr_value, mock)
 
                     # we don't handle references in lists or other data types yet
 
                 return mock
+
+    if TYPE_CHECKING:
+        @property
+        def patch(self) -> 'MockerFixture._Patcher':  # type: ignore
+            ...
 
 
 @pytest.fixture
